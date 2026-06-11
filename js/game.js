@@ -175,6 +175,65 @@
     osc.start(t);
     osc.stop(t + dur + 0.02);
   }
+  // ===== BGM（Web Audio によるオリジナルのチップチューン・ループ） =====
+  const BGM = {
+    enabled: localStorage.getItem('bb_bgm') !== '0',
+    playing: false,
+    step: 0,
+    nextTime: 0,
+    timer: null,
+    BPM: 122,
+    // 4小節ループ（16分音符×64ステップ）。0は休符、数値はMIDIノート番号
+    // コード進行: Am → F → C → G
+    LEAD: [
+      69, 0, 72, 0, 76, 0, 72, 0, 69, 0, 72, 0, 76, 0, 79, 0,
+      77, 0, 76, 0, 72, 0, 77, 0, 76, 0, 72, 0, 69, 0, 72, 0,
+      76, 0, 72, 0, 67, 0, 72, 0, 76, 0, 72, 0, 79, 0, 76, 0,
+      74, 0, 71, 0, 67, 0, 71, 0, 74, 0, 76, 0, 79, 0, 0, 0,
+    ],
+    BASS: [
+      45, 0, 0, 0, 52, 0, 0, 0, 45, 0, 0, 0, 52, 0, 0, 0,
+      41, 0, 0, 0, 48, 0, 0, 0, 41, 0, 0, 0, 48, 0, 0, 0,
+      48, 0, 0, 0, 55, 0, 0, 0, 48, 0, 0, 0, 55, 0, 0, 0,
+      43, 0, 0, 0, 50, 0, 0, 0, 43, 0, 0, 0, 50, 0, 50, 0,
+    ],
+    stepDur() { return 60 / this.BPM / 4; },
+    note(time, midi, dur, type, vol) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + dur + 0.02);
+    },
+    tick() {
+      const ahead = audioCtx.currentTime + 0.12;
+      while (this.nextTime < ahead) {
+        const i = this.step % this.LEAD.length;
+        if (this.LEAD[i]) this.note(this.nextTime, this.LEAD[i], this.stepDur() * 0.9, 'square', 0.03);
+        if (this.BASS[i]) this.note(this.nextTime, this.BASS[i], this.stepDur() * 3.2, 'triangle', 0.08);
+        this.nextTime += this.stepDur();
+        this.step++;
+      }
+    },
+    start() {
+      if (this.playing || !this.enabled) return;
+      ensureAudio();
+      if (!audioCtx) return;
+      this.playing = true;
+      this.step = 0;
+      this.nextTime = audioCtx.currentTime + 0.05;
+      this.timer = setInterval(() => this.tick(), 30);
+    },
+    stop() {
+      this.playing = false;
+      clearInterval(this.timer);
+    },
+  };
+
   const SFX = {
     paddle:  () => beep(440, 0.06, 'square', 0.09),
     brick:   () => beep(880, 0.05, 'square', 0.08),
@@ -221,7 +280,24 @@
     if (v && state !== 'play' && state !== 'intro') v = false;
     paused = v;
     pauseBtn.textContent = paused ? '▶' : '❚❚';
+    if (paused) BGM.stop();
+    else if (state === 'play' || state === 'intro') BGM.start();
   }
+
+  const musicBtn = document.getElementById('musicBtn');
+  function updateMusicBtn() {
+    musicBtn.classList.toggle('muted', !BGM.enabled);
+  }
+  musicBtn.addEventListener('click', () => {
+    ensureAudio();
+    BGM.enabled = !BGM.enabled;
+    localStorage.setItem('bb_bgm', BGM.enabled ? '1' : '0');
+    if (!BGM.enabled) BGM.stop();
+    else if ((state === 'play' || state === 'intro' || state === 'clear') && !paused) BGM.start();
+    updateMusicBtn();
+    musicBtn.blur();
+  });
+  updateMusicBtn();
   pauseBtn.addEventListener('click', () => {
     ensureAudio();
     setPaused(!paused);
@@ -296,11 +372,15 @@
   function silverHp() { return 2 + Math.floor((round - 1) / 8); }
 
   // ===== ゲーム進行 =====
+  // 開発用: URL に ?round=N を付けると指定ラウンドから自動開始（スクリーンショット撮影用）
+  const DEBUG_ROUND = parseInt(new URLSearchParams(location.search).get('round'), 10) || 0;
+
   function startGame() {
     score = 0;
     lives = 3;
-    round = 1;
+    round = DEBUG_ROUND >= 1 ? DEBUG_ROUND : 1;
     nextLifeScore = 20000;
+    BGM.start();
     loadRound();
   }
 
@@ -525,6 +605,7 @@
           if (lives < 0) {
             state = 'gameover';
             stateTimer = 0;
+            BGM.stop();
           } else {
             resetField(false);
           }
@@ -1032,5 +1113,6 @@
     draw();
     requestAnimationFrame(frame);
   }
+  if (DEBUG_ROUND) startGame();
   requestAnimationFrame(frame);
 })();

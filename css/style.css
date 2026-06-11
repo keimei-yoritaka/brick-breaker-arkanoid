@@ -37,7 +37,8 @@ html, body {
   user-select: none;
 }
 
-#pauseBtn {
+#pauseBtn,
+#musicBtn {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -54,8 +55,19 @@ html, body {
   touch-action: manipulation;
 }
 
-#pauseBtn:active {
+#pauseBtn:active,
+#musicBtn:active {
   background: rgba(120, 140, 180, 0.35);
+}
+
+#musicBtn {
+  right: 62px;
+  font-size: 18px;
+}
+
+#musicBtn.muted {
+  opacity: 0.35;
+  text-decoration: line-through;
 }
 
 #hint {
