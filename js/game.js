@@ -160,6 +160,7 @@
       try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* 無音で続行 */ }
     }
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    BGM.unlock();
   }
   function beep(freq, dur, type = 'square', vol = 0.08, slideTo = null) {
     if (!audioCtx) return;
@@ -175,10 +176,14 @@
     osc.start(t);
     osc.stop(t + dur + 0.02);
   }
-  // ===== BGM（Web Audio によるオリジナルのチップチューン・ループ） =====
+  // ===== BGM =====
+  // resources/ に BGM ファイル（DOVA-SYNDROME 提供・再配布禁止のためリポジトリ外）が
+  // あればそれを再生し、なければ Web Audio 合成のチップチューン・ループにフォールバックする
   const BGM = {
     enabled: localStorage.getItem('bb_bgm') !== '0',
     playing: false,
+    audio: null,      // 読み込みに成功した場合のみ HTMLAudioElement が入る
+    unlocked: false,  // iOS の自動再生制限解除済みフラグ
     step: 0,
     nextTime: 0,
     timer: null,
@@ -219,8 +224,32 @@
         this.step++;
       }
     },
+    init() {
+      const el = new Audio(encodeURI('resources/うさぎのカフェテリア.mp3'));
+      el.loop = true;
+      el.volume = 0.35;
+      el.addEventListener('canplaythrough', () => { this.audio = el; }, { once: true });
+      el.addEventListener('error', () => { this.audio = null; }, { once: true });
+    },
+    // iOS 等は ユーザー操作の中で play() しないと音が出ないため、
+    // 最初のタップ/クリック時に一度再生して即停止し、再生権を確保しておく
+    unlock() {
+      if (!this.audio || this.unlocked) return;
+      this.unlocked = true;
+      this.audio.play().then(() => {
+        if (!this.playing) {
+          this.audio.pause();
+          this.audio.currentTime = 0;
+        }
+      }).catch(() => { this.unlocked = false; });
+    },
     start() {
       if (this.playing || !this.enabled) return;
+      if (this.audio) {
+        this.playing = true;
+        this.audio.play().catch(() => {});
+        return;
+      }
       ensureAudio();
       if (!audioCtx) return;
       this.playing = true;
@@ -228,11 +257,17 @@
       this.nextTime = audioCtx.currentTime + 0.05;
       this.timer = setInterval(() => this.tick(), 30);
     },
-    stop() {
+    // reset=true で曲を先頭に戻す（ゲームオーバー時）。ポーズ解除では続きから再生する
+    stop(reset = false) {
       this.playing = false;
       clearInterval(this.timer);
+      if (this.audio) {
+        this.audio.pause();
+        if (reset) this.audio.currentTime = 0;
+      }
     },
   };
+  BGM.init();
 
   const SFX = {
     paddle:  () => beep(440, 0.06, 'square', 0.09),
@@ -605,7 +640,7 @@
           if (lives < 0) {
             state = 'gameover';
             stateTimer = 0;
-            BGM.stop();
+            BGM.stop(true);
           } else {
             resetField(false);
           }

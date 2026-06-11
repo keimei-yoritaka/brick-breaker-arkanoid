@@ -1,3 +1,4 @@
 .DS_Store
 .claude/
-resources/
+# DOVA-SYNDROME 提供の BGM。利用は可だが再配布禁止のためリポジトリには含めない
+resources/うさぎのカフェテリア.mp3
