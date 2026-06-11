@@ -2,13 +2,16 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>BRICK BREAKER — Arkanoid Style</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div id="wrapper">
-    <canvas id="game" width="448" height="620"></canvas>
+    <div id="stage">
+      <canvas id="game" width="448" height="620"></canvas>
+      <button id="pauseBtn" type="button" aria-label="ポーズ">❚❚</button>
+    </div>
     <p id="hint">
       操作: マウス / ←→キー ・ 発射&レーザー: クリック / スペース ・ ポーズ: P
     </p>

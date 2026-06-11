@@ -9,8 +9,17 @@
   // ===== キャンバス =====
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  const W = canvas.width;   // 448
-  const H = canvas.height;  // 620
+  // 論理座標系は 448x620 固定。Retina 等では実ピクセルを増やして高精細に描画する
+  const W = 448;
+  const H = 620;
+  function setupResolution() {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  setupResolution();
+  addEventListener('resize', setupResolution);
 
   // ===== フィールド寸法 =====
   const HUD_H = 48;
@@ -207,12 +216,24 @@
   const keys = {};
   let firePressed = false;
 
+  const pauseBtn = document.getElementById('pauseBtn');
+  function setPaused(v) {
+    if (v && state !== 'play' && state !== 'intro') v = false;
+    paused = v;
+    pauseBtn.textContent = paused ? '▶' : '❚❚';
+  }
+  pauseBtn.addEventListener('click', () => {
+    ensureAudio();
+    setPaused(!paused);
+    pauseBtn.blur(); // フォーカスが残るとスペースキーでボタンが再発火するため
+  });
+
   addEventListener('keydown', (e) => {
     if (['ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (e.repeat) return;
     keys[e.code] = true;
     if (e.code === 'Space') { ensureAudio(); firePressed = true; }
-    if (e.code === 'KeyP' && (state === 'play' || state === 'intro')) paused = !paused;
+    if (e.code === 'KeyP') setPaused(!paused);
   });
   addEventListener('keyup', (e) => { keys[e.code] = false; });
 
@@ -240,7 +261,7 @@
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && state === 'play') paused = true;
+    if (document.hidden) setPaused(true);
   });
 
   // ===== ユーティリティ =====
@@ -445,7 +466,12 @@
   // ===== 更新 =====
   function update(dt) {
     blink += dt;
-    if (paused) return;
+    if (paused) {
+      // ポーズ中の画面タップで再開（タップ入力は持ち越さない）
+      if (firePressed) setPaused(false);
+      firePressed = false;
+      return;
+    }
 
     // パドル幅アニメーション
     paddle.w += (paddle.targetW - paddle.w) * Math.min(1, dt * 10);
@@ -855,11 +881,12 @@
     ctx.fillText('HIGH SCORE', W / 2, 6);
     ctx.fillStyle = '#fff';
     ctx.fillText(String(hiScore).padStart(7, ' '), W / 2, 22);
+    // ROUND は右下に表示（右上はポーズボタンが重なるため）
     ctx.textAlign = 'right';
     ctx.fillStyle = '#f43030';
-    ctx.fillText('ROUND', W - 24, 6);
+    ctx.fillText('ROUND ', W - 50, H - 20);
     ctx.fillStyle = '#fff';
-    ctx.fillText(String(round), W - 30, 22);
+    ctx.fillText(String(round), W - 24, H - 20);
     // 残機（小さなバウス）
     for (let i = 0; i < Math.min(lives, 6); i++) {
       const lx = FIELD.left + 6 + i * 26, ly = H - 12;
@@ -904,6 +931,9 @@
       ctx.font = 'bold 22px "Courier New", monospace';
       ctx.fillStyle = '#fff';
       ctx.fillText('PAUSE', W / 2, H / 2);
+      ctx.font = 'bold 13px "Courier New", monospace';
+      ctx.fillStyle = '#aab';
+      ctx.fillText('タップ / P で再開', W / 2, H / 2 + 30);
     }
   }
 
