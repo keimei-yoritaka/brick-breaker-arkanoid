@@ -256,6 +256,23 @@
     movePaddleTo(canvasX(e.touches[0].clientX));
   }, { passive: false });
 
+  // 下部タッチエリア: 指で画面を隠さずにバーを操作できる
+  // X座標はキャンバス座標系に写像するので、エリア上の指の位置 = フィールド上のバー位置
+  const touchpad = document.getElementById('touchpad');
+  touchpad.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    ensureAudio();
+    firePressed = true;
+    touchpad.classList.add('active');
+    movePaddleTo(canvasX(e.touches[0].clientX));
+  }, { passive: false });
+  touchpad.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    movePaddleTo(canvasX(e.touches[0].clientX));
+  }, { passive: false });
+  touchpad.addEventListener('touchend', () => touchpad.classList.remove('active'));
+  touchpad.addEventListener('touchcancel', () => touchpad.classList.remove('active'));
+
   function movePaddleTo(x) {
     paddle.x = clamp(x, FIELD.left + paddle.w / 2, FIELD.right - paddle.w / 2);
   }
