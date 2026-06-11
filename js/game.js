@@ -187,20 +187,25 @@
     step: 0,
     nextTime: 0,
     timer: null,
-    BPM: 122,
-    // 4小節ループ（16分音符×64ステップ）。0は休符、数値はMIDIノート番号
-    // コード進行: Am → F → C → G
-    LEAD: [
-      69, 0, 72, 0, 76, 0, 72, 0, 69, 0, 72, 0, 76, 0, 79, 0,
-      77, 0, 76, 0, 72, 0, 77, 0, 76, 0, 72, 0, 69, 0, 72, 0,
-      76, 0, 72, 0, 67, 0, 72, 0, 76, 0, 72, 0, 79, 0, 76, 0,
-      74, 0, 71, 0, 67, 0, 71, 0, 74, 0, 76, 0, 79, 0, 0, 0,
+    BPM: 96,
+    // カフェ風ボサノバ調の8小節ループ。コード進行: Cmaj7 → Am7 → Dm7 → G7 ×2周
+    // bass: [ルート, 5度] / chord: コードの構成3音（MIDIノート番号）
+    BARS: [
+      { bass: [48, 55], chord: [64, 67, 71] }, // Cmaj7
+      { bass: [45, 52], chord: [60, 64, 67] }, // Am7
+      { bass: [50, 57], chord: [65, 69, 72] }, // Dm7
+      { bass: [43, 50], chord: [65, 71, 74] }, // G7
     ],
-    BASS: [
-      45, 0, 0, 0, 52, 0, 0, 0, 45, 0, 0, 0, 52, 0, 0, 0,
-      41, 0, 0, 0, 48, 0, 0, 0, 41, 0, 0, 0, 48, 0, 0, 0,
-      48, 0, 0, 0, 55, 0, 0, 0, 48, 0, 0, 0, 55, 0, 0, 0,
-      43, 0, 0, 0, 50, 0, 0, 0, 43, 0, 0, 0, 50, 0, 50, 0,
+    // 小節ごとのメロディ（キー: 小節内の16分音符位置 0〜15、値: MIDIノート番号）
+    MELODY: [
+      { 0: 76, 6: 74, 8: 72, 12: 74 },
+      { 0: 72, 6: 69, 8: 67 },
+      { 0: 65, 4: 69, 8: 72, 12: 74 },
+      { 0: 71, 8: 67 },
+      { 0: 76, 6: 79, 8: 76, 12: 72 },
+      { 0: 72, 6: 71, 8: 69 },
+      { 0: 77, 4: 76, 8: 74, 12: 72 },
+      { 0: 74, 4: 71, 8: 67 },
     ],
     stepDur() { return 60 / this.BPM / 4; },
     note(time, midi, dur, type, vol) {
@@ -217,9 +222,19 @@
     tick() {
       const ahead = audioCtx.currentTime + 0.12;
       while (this.nextTime < ahead) {
-        const i = this.step % this.LEAD.length;
-        if (this.LEAD[i]) this.note(this.nextTime, this.LEAD[i], this.stepDur() * 0.9, 'square', 0.03);
-        if (this.BASS[i]) this.note(this.nextTime, this.BASS[i], this.stepDur() * 3.2, 'triangle', 0.08);
+        const bar = Math.floor(this.step / 16) % this.MELODY.length;
+        const pos = this.step % 16;
+        const { bass, chord } = this.BARS[bar % this.BARS.length];
+        // ボサノバ風ベース: 1・3拍目にルート、2・4拍目の裏に5度
+        if (pos === 0 || pos === 8) this.note(this.nextTime, bass[0], 0.4, 'triangle', 0.09);
+        if (pos === 6 || pos === 14) this.note(this.nextTime, bass[1], 0.3, 'triangle', 0.07);
+        // コードを裏拍で軽くスタブ
+        if (pos === 4 || pos === 12) {
+          for (const n of chord) this.note(this.nextTime, n, 0.3, 'sine', 0.022);
+        }
+        // オルゴール風メロディ
+        const m = this.MELODY[bar][pos];
+        if (m) this.note(this.nextTime, m, 0.5, 'sine', 0.05);
         this.nextTime += this.stepDur();
         this.step++;
       }
